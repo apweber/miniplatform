@@ -17,7 +17,7 @@ services:
     build:
       target: builder          # use builder stage for dev (has gcc etc.)
     volumes:
-      - ./app:/app             # live mount — edit main.py, uvicorn reloads
+      - ./app:/build           # live mount — edit main.py, uvicorn reloads
     command:
       - uvicorn
       - main:app
