@@ -29,9 +29,6 @@ Networks:
 ## Quickstart
 
 ```bash
-# 1. Clone and enter the project
-git clone https://github.com/youruser/miniplatform
-cd miniplatform
 
 # 2. Copy and configure environment variables
 cp .env.example .env
