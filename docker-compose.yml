@@ -1,0 +1,99 @@
+# =============================================================================
+# docker-compose.yml — MiniPlatform production Compose file
+#
+# Services:
+#   nginx   — reverse proxy, single public entry point on port 80
+#   app     — FastAPI backend, internal only (not exposed to host)
+#   redis   — in-memory cache, internal only
+#
+# Usage:
+#   docker compose up -d          # start detached
+#   docker compose logs -f        # stream logs
+#   docker compose down           # stop and remove containers
+#   docker compose down -v        # also remove named volumes
+# =============================================================================
+
+services:
+
+  # ── Nginx reverse proxy ────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/static:/usr/share/nginx/html:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── FastAPI application ────────────────────────────────────────────────────
+  app:
+    image: ${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_REPO:-youruser/miniplatform-app}:${IMAGE_TAG:-latest}
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+      target: runtime
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_TTL:  "${REDIS_TTL:-30}"
+      APP_ENV:    "${APP_ENV:-production}"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ── Redis cache ────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    command: >
+      redis-server
+      --maxmemory        ${REDIS_MAXMEM:-128mb}
+      --maxmemory-policy allkeys-lru
+      --save             ""
+      --appendonly       no
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+# ── Named volumes ──────────────────────────────────────────────────────────
+volumes:
+  redis_data:
+
+# ── Networks ───────────────────────────────────────────────────────────────
+# frontend: nginx ↔ app   (public-facing traffic)
+# backend:  app   ↔ redis (internal only — Redis is never on the frontend net)
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true    # no external internet access from this network

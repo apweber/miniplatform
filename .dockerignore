@@ -1,0 +1,40 @@
+# =============================================================================
+# .dockerignore — files excluded from the Docker build context
+# Keeps the context small and prevents secrets leaking into the image layer.
+# =============================================================================
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets — never bake these into an image
+.env
+*.env
+
+# Version control
+.git/
+.gitignore
+
+# Editor / OS artefacts
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test files (not needed at runtime)
+tests/
+*.bats
+*.test.py
+
+# Compose files (only needed by the host, not the container)
+docker-compose*.yml
